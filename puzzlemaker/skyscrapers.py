@@ -1,6 +1,7 @@
 """Skyscrapers puzzle"""
 from grid import Grid
 import utils
+import random
 
 __all__ = ["SkyScrappers"]
 
@@ -65,6 +66,47 @@ def visible(heights):
             tallest = h
             n += 1
     return n
+    
+def rotate(seq):
+    """Right rotate a sequence.
+        >>> rotate([1, 2, 3])
+        [2, 3, 1]
+    """
+    return seq[1:] + seq[:1]
+    
+class Generator:
+    def __init__(self, size):
+        self.size = size
+        self.values = self.permute(self.initial_values(size), 10*size)
+            
+    def initial_values(self, size):
+        values = []
+        row = range(1, size+1)
+        for i in range(size):
+            values.append(row)
+            row = rotate(row)
+        return values
+        
+    def permute(self, values, n):
+        def permute_rows(values):
+            random.shuffle(values)
+            return values
+            
+        def permute_cols(values):
+            values = zip(*values)
+            random.shuffle(values)
+            return zip(*values)
+            
+        values = values[:]
+        for i in range(n):
+            values = permute_rows(values)
+            values = permute_cols(values)
+        return values
+    
+    def display(self, values=None):
+        values = values or self.values
+        for row in values:
+            print " ".join(str(d) for d in row)
     
 class Solver:
     """Skyscraper solver inspired by Norvig's Sudoku solver.
@@ -198,6 +240,10 @@ def main(filename):
     print "solutions:"
     for s in solutions:
         solver.print_grid(s)
+    
+def main(*a):
+    g = Generator(6)
+    g.display()
 
 if __name__ == '__main__':
     import sys
