@@ -46,16 +46,7 @@ class SkyScrappers:
         """
         
         return grid.svg
-        
-
-class Solver:
-    def __init__(self, rows, cols):
-        self.size = len(rows)
-        self.rows = rows
-        self.cols = cols
-        
-        self.cells = 1
-        
+                
 def some(values):
     for v in values:
         if v:
@@ -65,143 +56,148 @@ def some(values):
 def cross(A, B):
     return [(a, b) for a in A for b in B]
 
-def solve(size, row_constraints, col_constraints, findall=False):
+def visible(heights):
+    tallest = 0
+    n = 0
+    for h in heights:
+        h = int(h)
+        if h > tallest:
+            tallest = h
+            n += 1
+    return n
+    
+class Solver:
     """Skyscraper solver inspired by Norvig's Sudoku solver.
     
     http://norvig.com/sudoku.html
     """
-    rows = cols = range(size)
-    squares = cross(rows, cols)
-    digits = "".join(str(i) for i in range(1, size+1)) # assuming that the size will never be more than 9
-    values = dict((s, digits) for s in squares)
-    
-    unitlists = [cross(rows, [c]) for c in cols] + [cross([r], cols) for r in rows]
-    units = dict((s, [u for u in unitlists if s in u]) for s in squares)
-    peers = dict((s, set(s2 for u in units[s] for s2 in u if s2 != s)) for s in squares)
-    
-    def visible(heights):
-        tallest = 0
-        n = 0
-        for h in heights:
-            h = int(h)
-            if h > tallest:
-                tallest = h
-                n += 1
-        return n
-    
-    def validate(values):
-        for i, n in enumerate(row_constraints):
-            if n in digits:
-                heights = [values[i, j] for j in range(size)][::-1]
+    def __init__(self, size, row_constraints, col_constraints):
+        self.size = size
+        self.row_constraints = row_constraints
+        self.col_constraints = col_constraints
+        
+        rows = cols = range(size)
+        squares = cross(rows, cols)
+        digits = "".join(str(i) for i in range(1, size+1)) # assuming that the size will never be more than 9
+        values = dict((s, digits) for s in squares)
+
+        unitlists = [cross(rows, [c]) for c in cols] + [cross([r], cols) for r in rows]
+        units = dict((s, [u for u in unitlists if s in u]) for s in squares)
+        peers = dict((s, set(s2 for u in units[s] for s2 in u if s2 != s)) for s in squares)
+        
+        self.squares = squares
+        self.digits = digits
+        self.values = values
+        self.units = units
+        self.peers = peers
+        
+    def solve(self, findall=False):
+        if findall:
+            solutions = []
+            def callback(s):
+                solutions.append(s)
+                return False
+            self.search(self.values, callback)
+            return solutions
+        else:
+            return self.search(self.values)
+
+    def validate(self, values):
+        for i, n in enumerate(self.row_constraints):
+            if n in self.digits:
+                heights = [values[i, j] for j in range(self.size)][::-1]
                 if visible(heights) != int(n):
                     return False
-                    
-        for j, n in enumerate(col_constraints):
-            if n in digits:
-                if visible(values[i, j] for i in range(size)) != int(n):
+
+        for j, n in enumerate(self.col_constraints):
+            if n in self.digits:
+                heights = [values[i, j] for i in range(self.size)][::-1]
+                if visible(heights) != int(n):
                     return False
-                
+
         return True
-        
-    result = []
-    
-    def search(values):
+
+    def search(self, values, callback=None):
         if values is False:
             return False # Failed earlier
-            
-        if all(len(values[s]) == 1 for s in squares):
-            if validate(values) is False:
+
+        if all(len(values[s]) == 1 for s in self.squares):
+            if self.validate(values) is False:
                 return False
 
-            if findall:
-                result.append(values.copy())
-                return False
+            if callback:
+                if callback(values) == False:
+                    return False
+                else:
+                    return values
             else:
                 return values # Solved!
-        
+
         # Chose the unfilled square s with the fewest possibilities
-        _, s = min((len(values[s]), s) for s in squares if len(values[s]) > 1)
-        return some(search(assign(values.copy(), s, d)) 
+        _, s = min((len(values[s]), s) for s in self.squares if len(values[s]) > 1)
+        return some(self.search(self.assign(values.copy(), s, d), callback) 
                     for d in values[s])
-                    
-    def assign(values, s, d):
-        #print 'assign', s, d
-        #print_grid(values)
-        if all(eliminate(values, s, d2) for d2 in values[s] if d2 != d):
+
+    def assign(self, values, s, d):
+        if all(self.eliminate(values, s, d2) for d2 in values[s] if d2 != d):
             return values
         else:
             return False
             
-    def eliminate(values, s, d):
+    def eliminate(self, values, s, d):
         #print 'eliminate', s, d, values[s]
         if d not in values[s]: # already eliminated
             return values
         values[s] = values[s].replace(d, '')
-        
+
         if len(values[s]) == 0: #contradiction
             return False
-            
+
         if len(values[s]) == 1:
             # only one value left in the square. remove it from all its peers
             d2 = values[s]
             #print 'peers', d2, peers[s]
-            if not all(eliminate(values, s2, d2) for s2 in peers[s]):
+            if not all(self.eliminate(values, s2, d2) for s2 in self.peers[s]):
                 #print 'eliminate failed'
                 return False
-                
+
         ## Now check the places where d appears in the units of s
-        for u in units[s]:
+        for u in self.units[s]:
             dplaces = [s for s in u if d in values[s]]
             if len(dplaces) == 0:
                 return False
             elif len(dplaces) == 1:
                 # d can only be in one place in unit; assign it there
-                if not assign(values, dplaces[0], d):
+                if not self.assign(values, dplaces[0], d):
                     return False
         return values
 
-    def print_grid(values):
+    def print_grid(self, values):
         if values is False:
             print values
             return
         width = 1 + max(len(v) for v in values.values())
-        
+
         def hline():
-            print '+' + "-" * width * size + '-+'
-        
+            print '+' + "-" * width * self.size + '-+'
+
         print
         hline()
-        for i in range(size):
-            print "|" + "".join(values[i, j].center(width) for j in range(size)) + " | " + row_constraints[i]
+        for i in range(self.size):
+            print "|" + "".join(values[i, j].center(width) for j in range(self.size)) + " | " + self.row_constraints[i]
         hline()
-        print " " + "".join(str(c).center(width) for c in col_constraints)
-    
-    values = search(values)
-    if findall:
-        return result
-    else:
-        return values
-
-def main2(filenames):
-    import os
-    
-    for f in filenames:
-        puzzle = SkyScrappers.load(f)
-        svg = puzzle.render()
-        
-        f_svg = f.replace('.txt', '.svg')
-        
-        svg.save(f_svg)
-        os.system('svg2png %s' % f_svg)
-        print 'rendering', f
+        print " " + "".join(str(c).center(width) for c in self.col_constraints)
         
 def main(filename):
     puzzle = SkyScrappers.load(filename)
     size = puzzle.size
     data = puzzle.data
-    solutions = solve(puzzle.size, [data[i][size] for i in range(size)], [data[size][i] for i in range(size)], findall=True)
+    solver = Solver(puzzle.size, [data[i][size] for i in range(size)], [data[size][i] for i in range(size)])
+    
+    solutions = solver.solve(findall=True)
+    print "solutions:"
     for s in solutions:
-        print_grid(s)
+        solver.print_grid(s)
 
 if __name__ == '__main__':
     import sys
