@@ -1,9 +1,8 @@
-# Puzzle Maker
+# Puzzle Master
 
-PuzzleMaker is a utility to generate, verify, solve and render puzzles.
+PuzzleMaster is a utility to generate, verify, solve and render puzzles.
 
 USAGE:  
-    puzzlemaker generate regularmaze > p.txt
-    puzzlemaker render p.txt p.png
-    puzzlemaker solve p.txt > s.txt
-    
+    puzzlemaster generate regularmaze > p.txt
+    puzzlemaster render p.txt p.png
+    puzzlemaster solve p.txt > s.txt
