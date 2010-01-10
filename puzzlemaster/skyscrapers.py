@@ -14,6 +14,27 @@ def parse_grid(lines):
             d[r, c] = value
     return d
 
+def xrepr(d):
+    if isinstance(d, dict):
+        size = 1 + max(x for x, y in d.keys())
+        return " $ ".join(
+            "|".join(d[row, col] for col in range(size))
+            for row in range(size))
+    else:
+        return d
+    
+_tracelevel = 0
+def trace(f):
+    
+    def g(self, *a, **kw):
+        global _tracelevel
+        print " |  " * _tracelevel, '|--',  f.__name__, [xrepr(x) for x in a]
+        _tracelevel += 1
+        x = f(self, *a, **kw)
+        _tracelevel -= 1
+        return x
+    return g
+
 class SkyScrappersParser:
     def parse(self, lines):
         size = len(lines)-1
@@ -67,14 +88,33 @@ class SkyScrappers:
         return grid.svg
         
     def solve(self):
-        solver = Solver(self)
-        return solver.solve()
+        return Solver(self).solve()
+        
+    def solve_all(self):
+        return Solver(self).solve_all()
+        
+    def __str__(self):
+        d = self.data.copy()
+        for i in range(self.size):
+            d[i, self.size] = self.constraints['right'][i] or '*'
+            d[self.size, i] = self.constraints['bottom'][i] or '*'
+        d[self.size, self.size] = ""
+                        
+        return "\n".join(
+                    "".join(d[row, col] for col in range(self.size+1))
+                    for row in range(self.size+1))
 
 def some(values):
     for v in values:
         if v:
             return v
     return False
+    
+def iterjoin(iters):
+    """Join the given list of iterators"""
+    for it in iters:
+        for x in it:
+            yield x
 
 def cross(A, B):
     return [(a, b) for a in A for b in B]
@@ -142,9 +182,14 @@ class Solver:
         size = self.size
         rows = cols = range(size)
         squares = cross(rows, cols)
+        
         digits = "".join(str(i) for i in range(1, size+1)) # assuming that the size will never be more than 9
-        values = dict((s, digits) for s in squares)
-
+        
+        values = puzzle.data.copy()
+        for k in values:
+            if values[k] == '*':
+                values[k] = digits
+                
         unitlists = [cross(rows, [c]) for c in cols] + [cross([r], cols) for r in rows]
         units = dict((s, [u for u in unitlists if s in u]) for s in squares)
         peers = dict((s, set(s2 for u in units[s] for s2 in u if s2 != s)) for s in squares)
@@ -155,10 +200,16 @@ class Solver:
         self.units = units
         self.peers = peers
         
-    def solve(self, findall=False):
-        values = self.search(self.values)
-        if values:
-            return SkyScrappers(self.size, values, self.constraints)
+    def solve(self):
+        it = self.solve_all()
+        
+        try:
+            return it.next()
+        except StopIteration:
+            return None
+            
+    def solve_all(self):
+        return (SkyScrappers(self.size, values, self.constraints) for values in self.search(self.values))
 
     def validate(self, values):
         """
@@ -186,41 +237,46 @@ class Solver:
         return all(validate_right(row) for row in range(self.size)) \
                and all(validate_bottom(col) for col in range(self.size))
         
-    def debug(self, values):
-        print "\n".join(
-                    "|".join(values[i, j] 
-                    for i in range(self.size)) 
-                    for j in range(self.size))
+    def debug(self, values, indent=""):
+        sep = "\n" + indent
+        print indent + sep.join(
+                    "|".join(values[row, col] for col in range(self.size)) 
+                    for row in range(self.size))
                     
         def f(d):
             return "".join(str(d[i]) for i in range(len(d)))
             
-        print "right", f(self.constraints['right'])
-        print "bottom", f(self.constraints['bottom'])
+        print indent + "right", f(self.constraints['right'])
+        print indent + "bottom", f(self.constraints['bottom'])
 
-    def search(self, values):        
-        if values is False:
-            return False # Failed earlier
+    def search(self, values):
+        if values is False or values == []:
+            return [] # Failed earlier
 
         if all(len(values[s]) == 1 for s in self.squares):
             if self.validate(values) is False:
-                return False
+                return []
             else:
-                return values
+                return [values]
 
-        # Chose the unfilled square s with the fewest possibilities
+        # Choose the unfilled square s with the fewest possibilities
         _, s = min((len(values[s]), s) for s in self.squares if len(values[s]) > 1)
-        return some(self.search(self.assign(values.copy(), s, d))
+        
+        return iterjoin(self.search(self.assign(values.copy(), s, d))
                     for d in values[s])
+                    
+    def make_puzzle(self, values):
+        return SkyScrappers(self.size, values, self.constraints)
 
-    def assign(self, values, s, d):
+    def assign(self, values, s, d, level=0):
+        if values[s] == d:
+            return values
         if all(self.eliminate(values, s, d2) for d2 in values[s] if d2 != d):
             return values
         else:
             return False
-            
+          
     def eliminate(self, values, s, d):
-        #print 'eliminate', s, d, values[s]
         if d not in values[s]: # already eliminated
             return values
         values[s] = values[s].replace(d, '')
@@ -231,9 +287,7 @@ class Solver:
         if len(values[s]) == 1:
             # only one value left in the square. remove it from all its peers
             d2 = values[s]
-            #print 'peers', d2, peers[s]
             if not all(self.eliminate(values, s2, d2) for s2 in self.peers[s]):
-                #print 'eliminate failed'
                 return False
 
         ## Now check the places where d appears in the units of s
@@ -241,8 +295,8 @@ class Solver:
             dplaces = [s for s in u if d in values[s]]
             if len(dplaces) == 0:
                 return False
-            elif len(dplaces) == 1:
-                # d can only be in one place in unit; assign it there
+            elif len(dplaces) == 1 and values[dplaces[0]] != d:
+                # d can only be in one place in unit; assign it there if it is not already assigned
                 if not self.assign(values, dplaces[0], d):
                     return False
         return values
@@ -286,7 +340,11 @@ if __name__ == '__main__':
     #main(sys.argv[1])
     text = open(sys.argv[1]).read().split('\n\n')[-1]
     puzzle = SkyScrappersParser().parse(text.splitlines())
-    puzzle.render().save('1.svg')
-    puzzle.solve().render().save('s1.svg')
         
+    i = 0
+    for i, s in enumerate(puzzle.solve_all()):
+        print s
+        print
+    print 
+    print 'found', i, 'solutions'
     
