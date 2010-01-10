@@ -1,53 +1,75 @@
 """Skyscrapers puzzle"""
+import random
+
 from grid import Grid
 import utils
-import random
+from parser import register_puzzle
 
 __all__ = ["SkyScrappers"]
 
+def parse_grid(lines):
+    d = {}
+    for r, line in enumerate(lines):
+        for c, value in enumerate(line.strip()):
+            d[r, c] = value
+    return d
+
+class SkyScrappersParser:
+    def parse(self, lines):
+        size = len(lines)-1
+        grid = parse_grid(lines)
+        
+        constraints = {"right": {}, "bottom": {}}
+        for i in range(size):
+            constraints['right'][i] = grid.pop((i, size), None)
+            constraints['bottom'][i] = grid.pop((size, i), None)
+            
+        return SkyScrappers(size, grid, constraints)
+
 class SkyScrappers:
-    def __init__(self, data):
+    def __init__(self, size, data, constraints):
+        self.size = size
         self.data = data
-        self.size = len(data)-1
+        self.constraints = constraints
         
     @staticmethod
     def load(filename):
         data = [line.strip() for line in open(filename) if line.strip()]
         return SkyScrappers(data)
         
+    @staticmethod
+    def loads(text):
+        data = [line.strip() for line in text.splitlines() if line.strip()]
+        return SkyScrappers(data)
+    
     def render(self):
         """Returns svg object."""
         grid = Grid(self.size, self.size)
         grid.draw_grid(stroke='black', stroke_width=2)
         
-        for y, line in enumerate(self.data):
-            for x, c in enumerate(line):
-                if c not in " *":
-                    attrs = {'font-weight': 'normal'}
+        def text(row, col, value, **attrs):
+            if value is not None and value not in " *":
+                grid.text(col, row, value, **attrs)
+        
+        # Draw all the values in the cells
+        for (row, col), value in self.data.items():
+            text(row, col, value, font_weight="normal")
                     
-                    if y == self.size:
-                        attrs['yoffset'] = 40
-                        attrs['font-weight'] = 'bold'
-                    if x == self.size:
-                        attrs['xoffset'] = 20
-                        attrs['font-weight'] = 'bold'
-                    grid.text(x, y, c, **attrs)
+                    
+        # Draw right constraints. Give 0.25 offset to draw numbers close to the border.
+        for i, v in self.constraints['right'].items():
+            text(i, self.size-0.25, v, font_weight='bold')
 
-        """
-        def text(x, y, c, **kw):
-            if c:
-                grid.text(x, y, c, **kw)
-        
-        for i, c in enumerate(self.data[-1]):
-            text(i, self.size, c, yoffset=40)
-        
-        for i, line in enumerate(self.data[:-1]):
-            c = utils.listget(line, self.size)
-            text(self.size, i, c, xoffset=20)
-        """
+        # Draw bottom constraints. Give 0.25 offset to draw numbers close to the border.
+        for j, v in self.constraints['bottom'].items():
+            text(self.size-0.25, j, v, font_weight='bold')
         
         return grid.svg
-                
+        
+    def solve(self):
+        solver = Solver(self)
+        return solver.solve()
+
 def some(values):
     for v in values:
         if v:
@@ -113,11 +135,11 @@ class Solver:
     
     http://norvig.com/sudoku.html
     """
-    def __init__(self, size, row_constraints, col_constraints):
-        self.size = size
-        self.row_constraints = row_constraints
-        self.col_constraints = col_constraints
+    def __init__(self, puzzle):
+        self.size = puzzle.size
+        self.constraints = puzzle.constraints
         
+        size = self.size
         rows = cols = range(size)
         squares = cross(rows, cols)
         digits = "".join(str(i) for i in range(1, size+1)) # assuming that the size will never be more than 9
@@ -134,50 +156,61 @@ class Solver:
         self.peers = peers
         
     def solve(self, findall=False):
-        if findall:
-            solutions = []
-            def callback(s):
-                solutions.append(s)
-                return False
-            self.search(self.values, callback)
-            return solutions
-        else:
-            return self.search(self.values)
+        values = self.search(self.values)
+        if values:
+            return SkyScrappers(self.size, values, self.constraints)
 
     def validate(self, values):
-        for i, n in enumerate(self.row_constraints):
-            if n in self.digits:
-                heights = [values[i, j] for j in range(self.size)][::-1]
-                if visible(heights) != int(n):
-                    return False
+        """
+            >>> puzzle = SkyScrappers(2, {(0, 0): 1, (0, 1): 2, (1, 0): 2, (1, 1): 1}, {"right": [1, '*'], "bottom": ["*", "*"]})
+            >>> solver = Solver(puzzle)
+            >>> solver.validate(puzzle.data)
+            True
+        """
+        def validate_right(row):
+            n = self.constraints['right'][row]
+            # no constraint
+            if str(n) not in self.digits:
+                return True
+            heights = [values[row, col] for col in range(self.size)][::-1]
+            return visible(heights) == int(n)
+            
+        def validate_bottom(col):
+            n = self.constraints['bottom'][col]
+            # no constraint
+            if str(n) not in self.digits:
+                return True
+            heights = [values[row, col] for row in range(self.size)][::-1]
+            return visible(heights) == int(n)
 
-        for j, n in enumerate(self.col_constraints):
-            if n in self.digits:
-                heights = [values[i, j] for i in range(self.size)][::-1]
-                if visible(heights) != int(n):
-                    return False
+        return all(validate_right(row) for row in range(self.size)) \
+               and all(validate_bottom(col) for col in range(self.size))
+        
+    def debug(self, values):
+        print "\n".join(
+                    "|".join(values[i, j] 
+                    for i in range(self.size)) 
+                    for j in range(self.size))
+                    
+        def f(d):
+            return "".join(str(d[i]) for i in range(len(d)))
+            
+        print "right", f(self.constraints['right'])
+        print "bottom", f(self.constraints['bottom'])
 
-        return True
-
-    def search(self, values, callback=None):
+    def search(self, values):        
         if values is False:
             return False # Failed earlier
 
         if all(len(values[s]) == 1 for s in self.squares):
             if self.validate(values) is False:
                 return False
-
-            if callback:
-                if callback(values) == False:
-                    return False
-                else:
-                    return values
             else:
-                return values # Solved!
+                return values
 
         # Chose the unfilled square s with the fewest possibilities
         _, s = min((len(values[s]), s) for s in self.squares if len(values[s]) > 1)
-        return some(self.search(self.assign(values.copy(), s, d), callback) 
+        return some(self.search(self.assign(values.copy(), s, d))
                     for d in values[s])
 
     def assign(self, values, s, d):
@@ -226,9 +259,12 @@ class Solver:
         print
         hline()
         for i in range(self.size):
-            print "|" + "".join(values[i, j].center(width) for j in range(self.size)) + " | " + self.row_constraints[i]
+            print "|" + "".join(values[i, j].center(width) for j in range(self.size)) + " | " + self.constraints['right'][i]
         hline()
-        print " " + "".join(str(c).center(width) for c in self.col_constraints)
+        print " " + "".join(str(c).center(width) for c in self.constraints['bottom'])
+        
+
+register_puzzle("skyscrapers", SkyScrappers)
         
 def main(filename):
     puzzle = SkyScrappers.load(filename)
@@ -247,4 +283,10 @@ def main(*a):
 
 if __name__ == '__main__':
     import sys
-    main(sys.argv[1])
+    #main(sys.argv[1])
+    text = open(sys.argv[1]).read().split('\n\n')[-1]
+    puzzle = SkyScrappersParser().parse(text.splitlines())
+    puzzle.render().save('1.svg')
+    puzzle.solve().render().save('s1.svg')
+        
+    
