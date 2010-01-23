@@ -20,7 +20,7 @@ class Grid:
         
     def vline(self, x, y, height, **attrs):
         x, y, height = x*100, y*100, height*100
-        self.canvas.line(x1=x, y1=y, x2=x, y2=height, **attrs)
+        self.canvas.line(x1=x, y1=y, x2=x, y2=y+height, **attrs)
     
     def circle(self, cx, cy, r, **attrs):
         cx, cy = cx*100, cy*100

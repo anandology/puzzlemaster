@@ -4,6 +4,7 @@ import os.path
 
 import parser
 import skyscrapers
+import loop
 
 def main():
     cmd = sys.argv[1]
