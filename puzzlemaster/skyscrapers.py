@@ -3,16 +3,9 @@ import random
 
 from grid import Grid
 import utils
-from parser import register_puzzle
+from parser import register_puzzle, parse_grid
 
 __all__ = ["SkyScrappers"]
-
-def parse_grid(lines):
-    d = {}
-    for r, line in enumerate(lines):
-        for c, value in enumerate(line.strip()):
-            d[r, c] = value
-    return d
 
 def xrepr(d):
     if isinstance(d, dict):
@@ -37,14 +30,33 @@ def trace(f):
 
 class SkyScrappersParser:
     def parse(self, lines):
-        size = len(lines)-1
+        size = len(lines)-2
         grid = parse_grid(lines)
         
-        constraints = {"right": {}, "bottom": {}}
-        for i in range(size):
-            constraints['right'][i] = grid.pop((i, size), None)
-            constraints['bottom'][i] = grid.pop((size, i), None)
+        constraints = {
+            "top": {}, 
+            "right": {},
+            "bottom": {},  
+            "left": {}, 
+        }
+        for i in range(1, size+1):
+            constraints['top'][i-1] = grid.pop((0, i), None)
+            constraints['right'][i-1] = grid.pop((i, size+1), None)
+            constraints['bottom'][i-1] = grid.pop((size+1, i), None)
+            constraints['left'][i-1] = grid.pop((i, 0), None)
             
+        grid = dict(((x-1, y-1), v) for (x, y), v in grid.items())
+
+        """
+        print size
+        for key in constraints.keys():
+            print key, repr("".join(constraints[key][i] or "-" for i in range(size)))
+        
+        for i in range(size):
+            for j in range(size):
+                print grid[i, j],
+            print
+        """   
         return SkyScrappers(size, grid, constraints)
 
 class SkyScrappers:
@@ -81,10 +93,16 @@ class SkyScrappers:
         for i, v in self.constraints['right'].items():
             text(i, self.size-0.25, v, font_weight='bold')
 
+        for i, v in self.constraints['left'].items():
+            text(i, -0.75, v, font_weight='bold')
+
         # Draw bottom constraints. Give 0.25 offset to draw numbers close to the border.
         for j, v in self.constraints['bottom'].items():
             text(self.size-0.25, j, v, font_weight='bold')
-        
+
+        for j, v in self.constraints['top'].items():
+            text(-0.75, j, v, font_weight='bold')
+
         return grid.svg
         
     def solve(self):
@@ -340,11 +358,13 @@ if __name__ == '__main__':
     #main(sys.argv[1])
     text = open(sys.argv[1]).read().split('\n\n')[-1]
     puzzle = SkyScrappersParser().parse(text.splitlines())
-        
+    puzzle.render().save("1.svg")
+
+    """
     i = 0
     for i, s in enumerate(puzzle.solve_all()):
         print s
         print
     print 
     print 'found', i, 'solutions'
-    
+    """

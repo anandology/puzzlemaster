@@ -18,7 +18,7 @@ def parse(data):
     headers = []
     body = []
     
-    lines = (line.strip() for line in data.splitlines())
+    lines = (line.rstrip() for line in data.splitlines())
     
     headers = dict(split_kv(line) for line in itertools.takewhile(lambda line: line, lines))
     body = "\n".join(lines)
@@ -29,4 +29,12 @@ def parse(data):
     
 def parse_file(filename):
     return parse(open(filename).read())
+
+def parse_grid(lines):
+    d = {}
+    for r, line in enumerate(lines):
+        for c, value in enumerate(line.rstrip()):
+            d[r, c] = value
+    return d
+
 
