@@ -38,3 +38,6 @@ def parse_grid(lines):
     return d
 
 
+if __name__ == '__main__':
+    import doctest
+    doctest.testmod()

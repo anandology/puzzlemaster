@@ -15,12 +15,13 @@ class Grid:
         self.canvas = self.svg.translate(100, 100)
         
     def hline(self, x, y, width, **attrs):
-        x, y, width = x*100, y*100, width*100
-        self.canvas.line(x1=x, y1=y, x2=x+width, y2=y, **attrs)
+        self.line(x, y, x+width, y, **attrs)
         
     def vline(self, x, y, height, **attrs):
-        x, y, height = x*100, y*100, height*100
-        self.canvas.line(x1=x, y1=y, x2=x, y2=y+height, **attrs)
+        self.line(x, y, x, y+height, **attrs)
+        
+    def line(self, x1, y1, x2, y2, **attrs):
+        self.canvas.line(x1=x1*100, y1=y1*100, x2=x2*100, y2=y2*100, **attrs)
     
     def circle(self, cx, cy, r, **attrs):
         cx, cy = cx*100, cy*100
@@ -56,7 +57,7 @@ class Grid:
         """Draw numbers in each cell.
         """
         for (row, col), value in data.items():
-            self.text(row, col, value, **attrs)
+            self.text(col, row, value, **attrs)
                 
 def main():
     g = Grid(4, 4)

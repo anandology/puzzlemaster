@@ -28,13 +28,24 @@ def render(*puzzle_files):
         
 def solve(puzzle_file):
     puzzle = parser.parse_file(puzzle_file)
+    
     solutions = list(puzzle.solve())
+    
+    count = 0
+    for s in solutions:
+        count += 1
+        print s
+        print
+    
+    print "%d solutions found" % count
 
+    """
     filename = os.path.splitext(puzzle_file)[0] + '-s.svg'
     f = open(filename, 'w')
     f.write(solutions[0].render().tostring())
     f.close()
     print 'generated', filename
+    """
     
 if __name__ == "__main__":
     main()
