@@ -183,12 +183,12 @@ class TwistSolver:
         y1, x1 = a
         y2, x2 = b
         
-        p = x1, y2
-        q = x2, y1
+        p = y2, x1
+        q = y1, x2
         
         return abs(x2-x1) == 1 and abs(y2-y1) == 1 \
             and p in visited and q in visited \
-            and abs(visited[p] - visited[q])
+            and abs(visited[p] - visited[q]) == 1
             
     def _solve(self, graph, visited, node):
         if node in visited:
