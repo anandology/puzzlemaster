@@ -52,6 +52,12 @@ class Grid:
         x, y = x*100+xoffset, y*100+yoffset
         self.canvas.text(x=x, y=y, **attrs)(text)
         
+    def draw_numbers(self, data, **attrs):
+        """Draw numbers in each cell.
+        """
+        for (row, col), value in data.items():
+            self.text(row, col, value, **attrs)
+                
 def main():
     g = Grid(4, 4)
     g.draw_grid(stroke="black", stroke_width=1, stroke_dasharray="2 2")

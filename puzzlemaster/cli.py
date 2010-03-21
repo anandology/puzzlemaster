@@ -5,6 +5,7 @@ import os.path
 import parser
 import skyscrapers
 import loop
+import twist
 
 def main():
     cmd = sys.argv[1]
@@ -35,4 +36,5 @@ def solve(puzzle_file):
     f.close()
     print 'generated', filename
     
-    
+if __name__ == "__main__":
+    main()
