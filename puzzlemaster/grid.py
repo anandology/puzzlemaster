@@ -22,6 +22,9 @@ class Grid:
         
     def line(self, x1, y1, x2, y2, **attrs):
         self.canvas.line(x1=x1*100, y1=y1*100, x2=x2*100, y2=y2*100, **attrs)
+        
+    def rect(self, x, y, width, height, **attrs):
+        self.canvas.rect(x=x*100, y=y*100, width=width*100, height=height*100, **attrs)
     
     def circle(self, cx, cy, r, **attrs):
         cx, cy = cx*100, cy*100

@@ -7,6 +7,15 @@ from grid import Grid
 import pprint
 
 class TwistParser:
+    """Twist puzzle parser.
+    
+    Sample:
+    
+        1223
+        3114
+        4212
+        3434    
+    """
     def parse(self, lines):
         rows = len(lines)
         cols = len(lines[0])
@@ -14,8 +23,14 @@ class TwistParser:
         data = parser.parse_grid(lines)
         
         return Twist(rows, cols, data)
-        
+
 class TwistSolutionParser:
+    """Twist solution parser.
+    
+    Sample:
+    
+        >>> p = TwistSolutionParser()
+    """
     def parse(self, lines):
         data = parser.parse_grid(lines)
         
@@ -36,7 +51,7 @@ class TwistSolutionParser:
                 dx1, dy1, dx2, dy2 = markers[v]
                 x1, y1 = (x+dx1)/2, (y+dy1)/2
                 x2, y2 = (x+dx2)/2, (y+dy2)/2
-                c = (x1, y1), (x2, y2)
+                c = (y1, x1), (y2, x2)
                 connections.append(c)
                
         return TwistSolution(twist, connections)
@@ -57,7 +72,11 @@ class Twist:
     
     def render_grid(self):
         grid = Grid(self.cols, self.rows)
-        grid.draw_grid(stroke="black", stroke_width=1)
+
+        grid.rect(0, 0, 1, 1, fill="#ddd")
+        grid.rect(self.cols-1, self.rows-1, 1, 1, fill="#ddd")
+        
+        grid.draw_grid(stroke="black", stroke_width=2)
         grid.draw_numbers(self.data)
         return grid
         
@@ -206,7 +225,7 @@ class TwistSolver:
             if n not in visited and not self.are_crossing(n, node, visited):
                 for soln in self._solve(graph, visited, n):
                     yield soln
-        
+
 parser.register_puzzle("twist", Twist)
 parser.register_puzzle("twist-solution", TwistSolution)
 
